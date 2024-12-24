@@ -17,7 +17,7 @@ _icicle-emu x86 based emulator plugin for Binary Ninja._
 Contains all the register state for the current virtual machine context.
 Once the emulator is in a running state, registers cannot be modified.
 
-**RIP Cannot be modified after stepping in the emulator**
+**RIP Cannot be modified after stepping in the emulator** [icicle-emu](https://github.com/icicle-emu/icicle-python/issues/13)
 
 ### Memory Tab
 
