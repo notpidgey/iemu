@@ -22,25 +22,28 @@ class StackViewTab(QWidget):
         stack_view_tab_layout = QVBoxLayout()
         stack_creator_layout = QHBoxLayout()
 
-        self.stack_address_textbox = QLineEdit("0x1000")
-        self.stack_length_textbox = QLineEdit("0x1000")
-        self.stack_start_textbox = QLineEdit("0x1500")
-        self.allocate_stack_button = QPushButton("Allocate stack")
-        self.allocate_stack_button.clicked.connect(self.allocate_stack)
+        # monkey patch since not all archs have a stack pointer
+        # and currently its hardcoded to RSP so
+        if self.context_state.get_arch_name() == "x86_64":
+            self.stack_address_textbox = QLineEdit("0x1000")
+            self.stack_length_textbox = QLineEdit("0x1000")
+            self.stack_start_textbox = QLineEdit("0x1500")
+            self.allocate_stack_button = QPushButton("Allocate stack")
+            self.allocate_stack_button.clicked.connect(self.allocate_stack)
 
-        self.stack_address_textbox.editingFinished.connect(self.verify_and_update_text)
-        self.stack_length_textbox.editingFinished.connect(self.verify_and_update_text)
-        self.stack_start_textbox.editingFinished.connect(self.verify_and_update_text)
+            self.stack_address_textbox.editingFinished.connect(self.verify_and_update_text)
+            self.stack_length_textbox.editingFinished.connect(self.verify_and_update_text)
+            self.stack_start_textbox.editingFinished.connect(self.verify_and_update_text)
 
-        stack_creator_layout.addWidget(QLabel("Address:"))
-        stack_creator_layout.addWidget(self.stack_address_textbox)
-        stack_creator_layout.addWidget(QLabel("Length:"))
-        stack_creator_layout.addWidget(self.stack_length_textbox)
-        stack_creator_layout.addWidget(QLabel("RSP:"))
-        stack_creator_layout.addWidget(self.stack_start_textbox)
-        stack_creator_layout.addWidget(self.allocate_stack_button)
+            stack_creator_layout.addWidget(QLabel("Address:"))
+            stack_creator_layout.addWidget(self.stack_address_textbox)
+            stack_creator_layout.addWidget(QLabel("Length:"))
+            stack_creator_layout.addWidget(self.stack_length_textbox)
+            stack_creator_layout.addWidget(QLabel("RSP:"))
+            stack_creator_layout.addWidget(self.stack_start_textbox)
+            stack_creator_layout.addWidget(self.allocate_stack_button)
 
-        stack_view_tab_layout.addLayout(stack_creator_layout)
+            stack_view_tab_layout.addLayout(stack_creator_layout)
 
         stack_view_controls_layout = QHBoxLayout()
         self.stack_address_input = QLineEdit("0x1500")

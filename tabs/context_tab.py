@@ -6,10 +6,12 @@ from PySide6.QtCore import Qt
 
 from iemu.state.emulator_state import EmulatorState, EmulationStatus
 
+from iemu.state.mappings import get_arch_instruction_pointer, get_registers_for_mapping
 
 class ContextTab(QWidget):
     def __init__(self, parent, state: EmulatorState):
         super().__init__(parent)
+        self.register_textboxes = {}
         self.state = state
         self.init_ui()
 
@@ -19,42 +21,48 @@ class ContextTab(QWidget):
         self.name_label = QLabel()
         context_layout.addWidget(self.name_label)
 
-        context_layout.addWidget(QLabel("Platform:"))
-        self.platform_label = QLabel()
-        context_layout.addWidget(self.platform_label)
+        context_layout.addWidget(QLabel("Arch:"))
+        self.arch_label = QLabel()
+        context_layout.addWidget(self.arch_label)
 
         self.state.binary_view.add_listener(self.update_binary_view)
 
         register_layout = QGridLayout()
-        self.register_textboxes = {}
-
-        zero_hex_string = "0x0000000000000000"
-        for i, reg in enumerate(self.state.register_state.get()):
-            if reg == "RIP":
-                continue
-
-            label = QLabel(f"{reg}: ")
-            textbox = QLineEdit(zero_hex_string)
-            textbox.setAlignment(Qt.AlignLeft)
-            textbox.setFont(QFont("Courier", 10))
-            textbox.editingFinished.connect(self.validate_register_input)
-            self.register_textboxes[reg] = textbox
-            register_layout.addWidget(label, i // 2, (i % 2) * 2)
-            register_layout.addWidget(textbox, i // 2, (i % 2) * 2 + 1)
-
         run_layout = QGridLayout()
-        rip_label = QLabel("RIP: ")
-        self.rip_textbox = QLineEdit(zero_hex_string)
-        self.rip_textbox.setAlignment(Qt.AlignLeft)
-        self.rip_textbox.setFont(QFont("Courier", 10))
-        self.rip_textbox.editingFinished.connect(self.validate_register_input)
-        self.register_textboxes["RIP"] = self.rip_textbox
-        run_layout.addWidget(rip_label, 0, 0)
-        run_layout.addWidget(self.rip_textbox, 0, 1)
+
+        arch = self.state.binary_view.get().arch.name
+        mappings = get_registers_for_mapping(arch)
+        rip_name = get_arch_instruction_pointer(arch)
+
+        for i, (reg, size) in enumerate(mappings.items()):
+            # create an empty hex string given the size of the register
+            zero_hex_string = "0x" + "0" * (size // 8 * 2)
+
+            if reg == rip_name:
+                rip_label = QLabel(f"{rip_name}: ")
+                self.rip_textbox = QLineEdit(zero_hex_string)
+                self.rip_textbox.setAlignment(Qt.AlignLeft)
+                self.rip_textbox.setFont(QFont("Courier", 10))
+                self.rip_textbox.editingFinished.connect(self.validate_register_input)
+                run_layout.addWidget(rip_label, 0, 0)
+                run_layout.addWidget(self.rip_textbox, 0, 1)
+
+                textbox = self.rip_textbox
+            else:
+                label = QLabel(f"{reg}: ")
+                textbox = QLineEdit(zero_hex_string)
+                textbox.setAlignment(Qt.AlignLeft)
+                textbox.setFont(QFont("Courier", 10))
+                textbox.editingFinished.connect(self.validate_register_input)
+
+                register_layout.addWidget(label, i // 2, (i % 2) * 2)
+                register_layout.addWidget(textbox, i // 2, (i % 2) * 2 + 1)
+
+            self.register_textboxes[reg] = textbox
 
         self.state.register_state.add_listener(self.update_register_textboxes)
 
-        end_rip_label = QLabel("End RIP: ")
+        end_rip_label = QLabel(f"{rip_name} Target: ")
         self.end_rip_textbox = QLineEdit(zero_hex_string)
         self.end_rip_textbox.setAlignment(Qt.AlignLeft)
         self.end_rip_textbox.setFont(QFont("Courier", 10))
@@ -73,14 +81,23 @@ class ContextTab(QWidget):
 
     def update_binary_view(self, view):
         self.name_label.setText(str(os.path.basename(view.file.filename)))
-        self.platform_label.setText(str(view.platform))
+        self.arch_label.setText(str(view.arch.name))
 
     def update_register_textboxes(self, registers):
+        arch = self.state.binary_view.get().arch.name
+        mappings = get_registers_for_mapping(arch)
+
         for reg, value in registers.items():
-            self.register_textboxes[reg].setText(f"0x{value:016x}")
+            character_counter = int(mappings[reg] / 8 * 2)
+            print(f"character counter: {character_counter} {reg} {value}")
+            self.register_textboxes[reg].setText(f"0x{value:0{character_counter}x}")
 
     def update_target_rip(self, target):
-        self.end_rip_textbox.setText(f"0x{target:016x}")
+        arch = self.state.binary_view.get().arch.name
+        mappings = get_registers_for_mapping(arch)
+
+        character_counter = int(mappings[get_arch_instruction_pointer(arch)] / 8 * 2)
+        self.end_rip_textbox.setText(f"0x{target:0{character_counter}x}")
 
     def validate_register_input(self):
         if self.state.vm_status.get() == EmulationStatus.Running:

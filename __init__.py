@@ -7,18 +7,19 @@ from PySide6.QtCore import Qt, QRectF
 
 import icicle
 
-from .tabs.context_tab import ContextTab
+from iemu.tabs.context_tab import ContextTab
+from iemu.state.mappings import get_arch_mapping, get_registers_for_mapping, get_arch_instruction_pointer
 from iemu.state.emulator_state import EmulatorState, PagePermissions, EmulationStatus
-from .tabs.memory_mappings_tab import MemoryMappingsTab
-from .tabs.stack_view_tab import StackViewTab
-from .tabs.memory_view_tab import MemoryViewTab
+from iemu.tabs.memory_mappings_tab import MemoryMappingsTab
+from iemu.tabs.stack_view_tab import StackViewTab
+from iemu.tabs.memory_view_tab import MemoryViewTab
 
 instance_id = 0
 sidebar_widget_instances = {}
 
 
 class EmulatorSidebarWidget(SidebarWidget):
-    def __init__(self, name, frame, data):
+    def __init__(self, name, frame, data : BinaryView):
         global instance_id
         sidebar_widget_instances[data] = self
 
@@ -26,8 +27,13 @@ class EmulatorSidebarWidget(SidebarWidget):
         self.actionHandler = UIActionHandler()
         self.actionHandler.setupActionHandler(self)
 
+        if data.arch.name not in get_arch_mapping():
+            log.log_error("Unsupported architecture")
+            return
+
         self.prev_highlights = []
         self.emulator_state = EmulatorState()
+        self.emulator_state.binary_view.set(data)
 
         self.checkpoint_regs = {}
         self.checkpoint_sections = None
@@ -35,11 +41,7 @@ class EmulatorSidebarWidget(SidebarWidget):
         self.checkpoint_memory = None
         self.checkpoint_memory_data = {}
 
-        for reg in [
-            "RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP",
-            "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15",
-            "RIP", "RFLAGS"
-        ]:
+        for reg in get_registers_for_mapping(data.arch.name):
             self.emulator_state.set_register(reg, 0)
 
         tabs = QTabWidget()
@@ -94,7 +96,7 @@ class EmulatorSidebarWidget(SidebarWidget):
         clear_button.clicked.connect(self.clear_button_clicked)
         control_layout.addWidget(clear_button)
 
-        self.emulator_state.register_state.add_listener(self.monitor_rsp_highlight)
+        self.emulator_state.register_state.add_listener(self.monitor_rip_highlight)
         self.emulator_state.vm_status.add_listener(self.update_status_label)
 
         self.current_allocations = set()
@@ -168,19 +170,21 @@ class EmulatorSidebarWidget(SidebarWidget):
 
         self.emulator_state.vm_status.set(EmulationStatus.Running)
 
+        ip = get_arch_instruction_pointer(self.emulator_state.binary_view.get().arch.name)
+
         vm = self.emulator_state.vm_inst
         until = self.emulator_state.target_rip.get()
         if until != 0:
-            log.log_info(f"Running VM from RIP: {hex(vm.reg_read('RIP'))} to RIP: {hex(until)}")
+            log.log_info(f"Running VM from {ip}: {hex(vm.reg_read(ip))} to {ip}: {hex(until)}")
             status = vm.run_until(until)
         else:
-            log.log_info(f"Running VM from RIP: {hex(vm.reg_read('RIP'))}")
+            log.log_info(f"Running VM from {ip}: {hex(vm.reg_read(ip))}")
             status = vm.run()
 
         if status == icicle.RunStatus.UnhandledException:
             log.log_info(f"Status Code: {vm.exception_code}")
 
-        log.log_info(f"Run concluded at RIP: {hex(vm.reg_read('RIP'))}")
+        log.log_info(f"Run concluded at {ip}: {hex(vm.reg_read(ip))}")
 
         reg_state = self.emulator_state.register_state.get()
         for (_, reg) in enumerate(self.emulator_state.register_state.get()):
@@ -198,14 +202,16 @@ class EmulatorSidebarWidget(SidebarWidget):
 
         self.emulator_state.vm_status.set(EmulationStatus.Running)
 
+        ip = get_arch_instruction_pointer(self.emulator_state.binary_view.get().arch.name)
+
         vm = self.emulator_state.vm_inst
-        log.log_info(f"Run started at at RIP: {hex(vm.reg_read('RIP'))}")
+        log.log_info(f"Run started at at {ip}: {hex(vm.reg_read(ip))}")
         status = vm.step(1)
 
         if status == icicle.RunStatus.UnhandledException:
             log.log_info(f"Status Code: {vm.exception_code}")
 
-        log.log_info(f"Run concluded at RIP: {hex(vm.reg_read('RIP'))}")
+        log.log_info(f"Run concluded at {ip}: {hex(vm.reg_read(ip))}")
 
         reg_state = self.emulator_state.register_state.get()
         for (_, reg) in enumerate(self.emulator_state.register_state.get()):
@@ -362,12 +368,14 @@ class EmulatorSidebarWidget(SidebarWidget):
     def update_status_label(self, status):
         self.status_label.setText(f"Status: {status.name}")
 
-    def monitor_rsp_highlight(self, values):
+    def monitor_rip_highlight(self, values):
         for prev_highlight in self.prev_highlights:
             prev_highlight[0].set_auto_instr_highlight(prev_highlight[1], prev_highlight[2])
         self.prev_highlights.clear()
 
-        rip = values["RIP"]
+        arch_rip = get_arch_instruction_pointer(self.emulator_state.binary_view.get().arch.name)
+
+        rip = values[arch_rip]
         fun = self.emulator_state.binary_view.get().get_functions_containing(rip)
 
         if fun:
@@ -375,6 +383,13 @@ class EmulatorSidebarWidget(SidebarWidget):
             fun[0].set_auto_instr_highlight(rip, highlight.HighlightColor(red=0, green=120, blue=0))
 
             self.prev_highlights.append((fun[0], rip, previous_highlight))
+
+    def set_rip(self, rip):
+        arch_rip = get_arch_instruction_pointer(self.emulator_state.binary_view.get().arch.name)
+        self.emulator_state.set_register(arch_rip, rip)
+
+    def set_target_rip(self, rip):
+        self.emulator_state.set_rip_target(rip)
 
     def notifyOffsetChanged(self, offset):
         self.offset = offset
@@ -426,8 +441,8 @@ def callbackmethod(bv):
 def range_address_handle_run(bv, start, len):
     widget = sidebar_widget_instances.get(bv)
     if widget:
-        widget.emulator_state.set_register("RIP", start)
-        widget.emulator_state.set_rip_target(start + len)
+        widget.set_rip(start)
+        widget.set_target_rip(start + len)
 
         widget.run_button_clicked()
     else:
@@ -436,7 +451,8 @@ def range_address_handle_run(bv, start, len):
 def address_handle_run(bv, start):
     widget = sidebar_widget_instances.get(bv)
     if widget:
-        widget.emulator_state.set_register("RIP", start)
+        widget.set_rip(start)
+
         widget.run_button_clicked()
     else:
         log.log_error("Unable to find iEmulator associated with the current BinaryView")
@@ -445,7 +461,7 @@ def address_handle_run(bv, start):
 def update_rip(bv, start):
     widget = sidebar_widget_instances.get(bv)
     if widget:
-        widget.emulator_state.set_register("RIP", start)
+        widget.set_rip(start)
     else:
         log.log_error("Unable to find iEmulator associated with the current BinaryView")
 
