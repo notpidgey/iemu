@@ -109,6 +109,8 @@ class EmulatorSidebarWidget(SidebarWidget):
         self.setLayout(layout)
         self.emulator_state.binary_view.set(data)
 
+        self.emulator_state.create_vm_instance()
+
         instance_id += 1
 
     def initialize_button_clicked(self):
