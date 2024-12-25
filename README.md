@@ -1,7 +1,9 @@
 # iEmulator
 Author: **snow**
 
-_icicle-emu x86 based emulator plugin for Binary Ninja._
+_icicle-emu based emulator plugin for Binary Ninja._
+
+Supports: x86/x86_64
 
 ## Description:
 
@@ -40,6 +42,11 @@ Dump view of allocated memory inside the emulator. Can only be used once the VM 
 "Dump" brings up a prompt which allows you to dump the memory to a file
 
 "Write String" allows you to write a string to the memory with the support of escape codes
+
+## Architectures
+If you would like an architecture to be added, please open an issue or a pull request.
+This should be trivial but takes some manual labor to add desired registers and mappings inside of `state/mappings.py`
+Not every architecture will have a stack pointer so you do not have to modify `get_stack_pointer_register` if its appropriate.
 
 ## License
 
