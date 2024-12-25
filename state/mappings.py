@@ -18,6 +18,13 @@ def get_registers_for_mapping(arch):
     else:
         return {}
 
+def get_stack_pointer_register(arch):
+    if arch == 'x86_64':
+        return 'RSP'
+    elif arch == 'x86':
+        return 'ESP'
+    else:
+        return ''
 
 def get_arch_instruction_pointer(arch):
     if arch == 'x86_64':

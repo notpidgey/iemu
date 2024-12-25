@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt
 
 import icicle
 
-from iemu.util.util import verify_hex_string
+from iemu.util.util import verify_hex_string, get_stack_pointer_register
 from iemu.state.emulator_state import EmulatorState, PagePermissions, EmulationStatus
 
 
@@ -24,7 +24,8 @@ class StackViewTab(QWidget):
 
         # monkey patch since not all archs have a stack pointer
         # and currently its hardcoded to RSP so
-        if self.context_state.get_arch_name() == "x86_64":
+        self.sp = get_stack_pointer_register(self.context_state.get_arch_name())
+        if self.sp != '':
             self.stack_address_textbox = QLineEdit("0x1000")
             self.stack_length_textbox = QLineEdit("0x1000")
             self.stack_start_textbox = QLineEdit("0x1500")
@@ -39,7 +40,7 @@ class StackViewTab(QWidget):
             stack_creator_layout.addWidget(self.stack_address_textbox)
             stack_creator_layout.addWidget(QLabel("Length:"))
             stack_creator_layout.addWidget(self.stack_length_textbox)
-            stack_creator_layout.addWidget(QLabel("RSP:"))
+            stack_creator_layout.addWidget(QLabel(f"{self.sp}:"))
             stack_creator_layout.addWidget(self.stack_start_textbox)
             stack_creator_layout.addWidget(self.allocate_stack_button)
 
@@ -97,7 +98,7 @@ class StackViewTab(QWidget):
             return
 
         self.context_state.add_allocation(address, length, PagePermissions.READ | PagePermissions.WRITE)
-        self.context_state.set_register("RSP", start)
+        self.context_state.set_register(self.sp, start)
 
         show_message_box("Memory Allocated", "RSP has been updated to starting address",
                          MessageBoxButtonSet.OKButtonSet, MessageBoxIcon.InformationIcon)
