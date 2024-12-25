@@ -89,7 +89,6 @@ class ContextTab(QWidget):
 
         for reg, value in registers.items():
             character_counter = int(mappings[reg] / 8 * 2)
-            print(f"character counter: {character_counter} {reg} {value}")
             self.register_textboxes[reg].setText(f"0x{value:0{character_counter}x}")
 
     def update_target_rip(self, target):
