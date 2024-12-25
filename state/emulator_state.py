@@ -3,6 +3,8 @@ import icicle
 
 from enum import IntFlag
 
+from iemu.state.mappings import get_arch_mapping
+
 
 class PagePermissions(IntFlag):
     NO_ACCESS = 0
@@ -53,7 +55,7 @@ class Observable(Generic[T]):
 
 class EmulatorState:
     def __init__(self):
-        self.vm_inst: Optional[icicle.Icicle] = icicle.Icicle("x86_64", jit=False)
+        self.vm_inst: Optional[icicle.Icicle] = None
         self.vm_status = Observable[EmulationStatus](EmulationStatus.Offline)
 
         self.binary_view = Observable[BinaryView](None)
@@ -138,7 +140,7 @@ class EmulatorState:
     def create_vm_instance(self):
         arch = self.binary_view.get().arch
 
-        arch_mapping = self.get_arch_mapping()
+        arch_mapping = get_arch_mapping()
         icicle_arch = arch_mapping[arch.name]
 
         self.vm_inst = icicle.Icicle(icicle_arch, jit=False)

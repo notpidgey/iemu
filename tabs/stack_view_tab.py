@@ -7,9 +7,9 @@ from PySide6.QtCore import Qt
 
 import icicle
 
-from iemu.util.util import verify_hex_string, get_stack_pointer_register
+from iemu.util.util import verify_hex_string
 from iemu.state.emulator_state import EmulatorState, PagePermissions, EmulationStatus
-
+from iemu.state.mappings import get_stack_pointer_register
 
 class StackViewTab(QWidget):
     def __init__(self, parent, state: EmulatorState):
@@ -49,8 +49,11 @@ class StackViewTab(QWidget):
         stack_view_controls_layout = QHBoxLayout()
         self.stack_address_input = QLineEdit("0x1500")
         self.row_count_dropdown = QComboBox()
+        self.row_value_width_dropdown = QComboBox()
         self.row_count_dropdown.addItems(["1", "2", "4", "8", "16", "32", "64", "128", "256"])
         self.row_count_dropdown.setCurrentText("8")
+        self.row_value_width_dropdown.addItems(["1", "2", "4", "8", "16", "32"])
+        self.row_value_width_dropdown.setCurrentText("8")
         self.view_button = QPushButton("View")
         self.view_button.clicked.connect(self.view_stack)
 
@@ -58,6 +61,7 @@ class StackViewTab(QWidget):
         stack_view_controls_layout.addWidget(self.stack_address_input)
         stack_view_controls_layout.addWidget(QLabel("Number of Rows:"))
         stack_view_controls_layout.addWidget(self.row_count_dropdown)
+        stack_view_controls_layout.addWidget(self.row_value_width_dropdown)
         stack_view_controls_layout.addWidget(self.view_button)
 
         self.stack_address_input.editingFinished.connect(self.verify_and_update_text)
@@ -100,18 +104,18 @@ class StackViewTab(QWidget):
         self.context_state.add_allocation(address, length, PagePermissions.READ | PagePermissions.WRITE)
         self.context_state.set_register(self.sp, start)
 
-        show_message_box("Memory Allocated", "RSP has been updated to starting address",
+        show_message_box("Memory Allocated", f"{self.sp} has been updated to starting address",
                          MessageBoxButtonSet.OKButtonSet, MessageBoxIcon.InformationIcon)
 
     def view_stack(self):
-        vm = self.context_state.vm_inst
-        if not vm:
-            show_message_box("View Error", "VM is not initialized.",
+        if self.context_state.vm_status.get() == EmulationStatus.Offline:
+            show_message_box("Allocation Error", "VM is not initialized.",
                              MessageBoxButtonSet.OKButtonSet, MessageBoxIcon.ErrorIcon)
             return
 
         stack_address = int(self.stack_address_input.text(), 16)
         row_count = int(self.row_count_dropdown.currentText())
+        value_width = int(self.row_value_width_dropdown.currentText())
 
         # Temporarily disconnect the itemChanged signal
         self.stack_view_table.itemChanged.disconnect(self.update_stack_value)
@@ -120,12 +124,12 @@ class StackViewTab(QWidget):
         self.stack_view_table.setRowCount(0)
 
         for i in range(-row_count, row_count + 1):
-            address = stack_address + (i * 8)
+            address = stack_address + (i * value_width)
             if address < 0:
                 continue
 
             try:
-                value = vm.mem_read(address, 8)
+                value = self.context_state.vm_inst.mem_read(address, value_width)
                 value_hex = ''.join(f'{byte:02x}' for byte in value)
                 editable = True
             except icicle.MemoryException:
@@ -135,7 +139,9 @@ class StackViewTab(QWidget):
             row_position = self.stack_view_table.rowCount()
             self.stack_view_table.insertRow(row_position)
             address_item = QTableWidgetItem(hex(address))
+
             value_item = QTableWidgetItem(value_hex)
+            value_item.setData(Qt.UserRole, value_width)
 
             address_item.setFlags(address_item.flags() & ~Qt.ItemIsEditable)
             if not editable:
@@ -176,16 +182,25 @@ class StackViewTab(QWidget):
             address_item = self.stack_view_table.item(row, 0)
             address = int(address_item.text(), 16)
 
+            value_width = item.data(Qt.UserRole)
             new_value_hex = item.text()
 
-            try:
-                new_value = int(new_value_hex, 16)
-                new_value_hex = f"{new_value:016x}"
-            except ValueError:
-                original_value = vm.mem_read(address, 8)
+            expected_length = value_width * 2
+            new_value_hex_stripped = new_value_hex.lstrip('0x')
+            if len(new_value_hex_stripped) != expected_length:
+                original_value = vm.mem_read(address, value_width)
                 original_value_hex = ''.join(f'{byte:02x}' for byte in original_value)
                 item.setText(original_value_hex)
                 return
 
-            vm.mem_write(address, new_value.to_bytes(8, byteorder='big'))
+            try:
+                new_value = int(new_value_hex, 16)
+                new_value_hex = f"{new_value:0{expected_length}x}"
+            except ValueError:
+                original_value = vm.mem_read(address, value_width)
+                original_value_hex = ''.join(f'{byte:02x}' for byte in original_value)
+                item.setText(original_value_hex)
+                return
+
+            vm.mem_write(address, new_value.to_bytes(value_width, byteorder='big'))
             item.setText(new_value_hex)

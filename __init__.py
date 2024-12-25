@@ -67,32 +67,32 @@ class EmulatorSidebarWidget(SidebarWidget):
         self.control_widget.setVisible(True)
 
         initialize_button = QPushButton("Initialize")
-        initialize_button.setStyleSheet("background-color: #184d1a; color: white;")
+        initialize_button.setStyleSheet("background-color: #357C4C")
         initialize_button.clicked.connect(self.initialize_button_clicked)
         control_layout.addWidget(initialize_button)
 
         run_button = QPushButton("Run")
-        run_button.setStyleSheet("background-color: #4CAF50; color: white;")
+        run_button.setStyleSheet("background-color: #77C16C")
         run_button.clicked.connect(self.run_button_clicked)
         control_layout.addWidget(run_button)
 
         step_button = QPushButton("Step")
-        step_button.setStyleSheet("background-color: #FFC107; color: white;")
+        step_button.setStyleSheet("background-color: #F6B26B")
         step_button.clicked.connect(self.step_button_clicked)
         control_layout.addWidget(step_button)
 
         checkpoint_button = QPushButton("Checkpoint")
-        checkpoint_button.setStyleSheet("background-color: #f57c73; color: white;")
+        checkpoint_button.setStyleSheet("background-color: #5F93BF")
         checkpoint_button.clicked.connect(self.checkpoint_button_clicked)
         control_layout.addWidget(checkpoint_button)
 
         restart_button = QPushButton("Load Checkpoint")
-        restart_button.setStyleSheet("background-color: #F44336; color: white;")
+        restart_button.setStyleSheet("background-color: #9CC3E0")
         restart_button.clicked.connect(self.restart_button_clicked)
         control_layout.addWidget(restart_button)
 
         clear_button = QPushButton("Clear")
-        clear_button.setStyleSheet("background-color: #9E9E9E; color: white;")
+        clear_button.setStyleSheet("background-color: #A1A1A1")
         clear_button.clicked.connect(self.clear_button_clicked)
         control_layout.addWidget(clear_button)
 
@@ -117,7 +117,7 @@ class EmulatorSidebarWidget(SidebarWidget):
             show_message_box("Error", "Emulator is already initialized.",
                              MessageBoxButtonSet.OKButtonSet, )
 
-        self.emulator_state.vm_inst = icicle.Icicle("x86_64", jit=False)
+        self.emulator_state.create_vm_instance()
         log.log_info(f"Initialized VM {self.emulator_state.vm_inst}")
 
         sections = self.emulator_state.mapped_sections.get()
@@ -313,7 +313,7 @@ class EmulatorSidebarWidget(SidebarWidget):
         # the unmaping of the memory regions correctly, but its just safer to create a new vm
         # i dont know what other state is saved in there
 
-        self.emulator_state.vm_inst = icicle.Icicle("x86_64", jit=False)
+        self.emulator_state.create_vm_instance()
         log.log_info(f"Initialized VM {self.emulator_state.vm_inst}")
 
         reg_state = self.emulator_state.register_state.get()
