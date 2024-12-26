@@ -5,7 +5,7 @@ _icicle-emu based emulator plugin for Binary Ninja._
 
 Supports: x86/x86_64
 
-![](https://i.imgur.com/llLSA7g.mp4)
+[![iEmu demo](https://i.imgur.com/clACzcr.png)](https://i.imgur.com/llLSA7g.mp4)
 
 ## Description:
 
