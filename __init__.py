@@ -118,8 +118,8 @@ class EmulatorSidebarWidget(SidebarWidget):
         instance_id += 1
 
     def create_args_setup(self, bv: BinaryView, func: Function):
-        dialog = QDialog()
-        dialog.setWindowTitle("Setup Function Arguments")
+        self.dialog = QDialog()
+        self.dialog.setWindowTitle("Setup Function Arguments")
 
         layout = QVBoxLayout()
 
@@ -181,10 +181,15 @@ class EmulatorSidebarWidget(SidebarWidget):
 
         layout.addLayout(button_layout)
 
-        dialog.setLayout(layout)
-        dialog.exec()
+        self.dialog.setLayout(layout)
+        self.dialog.show()
 
     def set_parameters_clicked(self):
+        if self.emulator_state.vm_status.get() != EmulationStatus.Initialized:
+            show_message_box("Error", "Unable to modify state of VM.",
+                             MessageBoxButtonSet.OKButtonSet)
+            return
+
         for (var, value) in self.current_args:
             value_width = var.type.width
             verified_value = int(verify_hex_string(value.text(), False, value_width), 16)
@@ -195,8 +200,11 @@ class EmulatorSidebarWidget(SidebarWidget):
                 stack_pointer_value = self.emulator_state.vm_read_reg(stack_pointer)
 
                 stack_address = stack_pointer_value + stack_offset
-                self.emulator_state.vm_inst.mem_write(stack_address,
+                try:
+                    self.emulator_state.vm_inst.mem_write(stack_address,
                                                       verified_value.to_bytes(value_width, byteorder='big'))
+                except icicle.MemoryException as e:
+                    log.log_error(f"Error writing to stack: {e}")
             elif var.source_type == VariableSourceType.RegisterVariableSourceType:
                 bv = self.emulator_state.binary_view.get()
                 register = bv.arch.get_reg_name(var.storage)
