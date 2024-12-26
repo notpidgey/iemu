@@ -145,6 +145,7 @@ class EmulatorSidebarWidget(SidebarWidget):
                 reg_offset_label.setFont(font)
                 reg_offset_value = QLineEdit(f"{0:0{var.type.width * 2}x}")
                 reg_offset_value.setFixedWidth(fixed_width)
+                reg_offset_value.setFont(font)
 
                 reg_offset_value.setProperty("target_byte_width", var.type.width)
                 reg_offset_value.editingFinished.connect(self.verify_and_update_text)
@@ -162,6 +163,7 @@ class EmulatorSidebarWidget(SidebarWidget):
                 reg_offset_value = QLineEdit(
                     verify_hex_string(hex(self.emulator_state.get_register(register.upper())), False, var.type.width))
                 reg_offset_value.setFixedWidth(fixed_width)
+                reg_offset_value.setFont(font)
 
                 reg_offset_value.setProperty("target_byte_width", var.type.width)
                 reg_offset_value.editingFinished.connect(self.verify_and_update_text)
@@ -175,7 +177,7 @@ class EmulatorSidebarWidget(SidebarWidget):
             layout.addLayout(variable_layout)
 
         button_layout = QHBoxLayout()
-        set_parameters_button = QPushButton("Set Parameters")
+        set_parameters_button = QPushButton("Set Arguments")
         button_layout.addWidget(set_parameters_button)
         set_parameters_button.clicked.connect(self.set_parameters_clicked)
 
