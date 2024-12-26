@@ -1,25 +1,29 @@
 from binaryninja import *
 from binaryninjaui import SidebarWidget, SidebarWidgetType, Sidebar, UIActionHandler, SidebarWidgetLocation, \
     SidebarContextSensitivity
-from PySide6.QtWidgets import QVBoxLayout, QTabWidget, QWidget, QPushButton, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QVBoxLayout, QTabWidget, QWidget, QPushButton, QHBoxLayout, QLabel, QDialog, QLineEdit, \
+    QSizePolicy
 from PySide6.QtGui import QImage, QPainter, QFont, QColor
 from PySide6.QtCore import Qt, QRectF
 
 import icicle
 
 from iemu.tabs.context_tab import ContextTab
-from iemu.state.mappings import get_arch_mapping, get_registers_for_mapping, get_arch_instruction_pointer
+from iemu.state.mappings import get_arch_mapping, get_registers_for_mapping, get_arch_instruction_pointer, \
+    get_stack_pointer_register
 from iemu.state.emulator_state import EmulatorState, PagePermissions, EmulationStatus
 from iemu.tabs.memory_mappings_tab import MemoryMappingsTab
 from iemu.tabs.stack_view_tab import StackViewTab
 from iemu.tabs.memory_view_tab import MemoryViewTab
+
+from iemu.util.util import verify_hex_string
 
 instance_id = 0
 sidebar_widget_instances = {}
 
 
 class EmulatorSidebarWidget(SidebarWidget):
-    def __init__(self, name, frame, data : BinaryView):
+    def __init__(self, name, frame, data: BinaryView):
         global instance_id
         sidebar_widget_instances[data] = self
 
@@ -113,6 +117,103 @@ class EmulatorSidebarWidget(SidebarWidget):
 
         instance_id += 1
 
+    def create_args_setup(self, bv: BinaryView, func: Function):
+        dialog = QDialog()
+        dialog.setWindowTitle("Setup Function Arguments")
+
+        layout = QVBoxLayout()
+
+        font = QFont("Courier")
+        font.setPointSize(10)
+
+        fixed_width = 160
+
+        self.current_args = []
+        for var in func.parameter_vars.vars:
+            variable_layout = QHBoxLayout()
+
+            variable_name = QLabel(f"{var.name}")
+            variable_name.setStyleSheet("font-weight: bold;")
+            variable_name.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            variable_layout.addWidget(variable_name)
+
+            # initialize the default text value to the hex size of the variable
+            if var.source_type == VariableSourceType.StackVariableSourceType:
+                stack_offset = var.storage
+
+                reg_offset_label = QLabel(f"+{hex(stack_offset)} [{hex(var.type.width)}]")
+                reg_offset_label.setFont(font)
+                reg_offset_value = QLineEdit(f"{0:0{var.type.width * 2}x}")
+                reg_offset_value.setFixedWidth(fixed_width)
+
+                reg_offset_value.setProperty("target_byte_width", var.type.width)
+                reg_offset_value.editingFinished.connect(self.verify_and_update_text)
+                self.current_args.append((var, reg_offset_value))
+
+                variable_layout.addWidget(reg_offset_label)
+                variable_layout.addWidget(reg_offset_value)
+
+                layout.addLayout(variable_layout)
+            elif var.source_type == VariableSourceType.RegisterVariableSourceType:
+                register = bv.arch.get_reg_name(var.storage)
+
+                reg_offset_label = QLabel(f"{register} [{hex(var.type.width)}]")
+                reg_offset_label.setFont(font)
+                reg_offset_value = QLineEdit(
+                    verify_hex_string(hex(self.emulator_state.get_register(register.upper())), False, var.type.width))
+                reg_offset_value.setFixedWidth(fixed_width)
+
+                reg_offset_value.setProperty("target_byte_width", var.type.width)
+                reg_offset_value.editingFinished.connect(self.verify_and_update_text)
+                self.current_args.append((var, reg_offset_value))
+
+                variable_layout.addWidget(reg_offset_label)
+                variable_layout.addWidget(reg_offset_value)
+
+                layout.addLayout(variable_layout)
+
+            layout.addLayout(variable_layout)
+
+        button_layout = QHBoxLayout()
+        set_parameters_button = QPushButton("Set Parameters")
+        button_layout.addWidget(set_parameters_button)
+        set_parameters_button.clicked.connect(self.set_parameters_clicked)
+
+        layout.addLayout(button_layout)
+
+        dialog.setLayout(layout)
+        dialog.exec()
+
+    def set_parameters_clicked(self):
+        for (var, value) in self.current_args:
+            value_width = var.type.width
+            verified_value = int(verify_hex_string(value.text(), False, value_width), 16)
+
+            if var.source_type == VariableSourceType.StackVariableSourceType:
+                stack_offset = var.storage
+                stack_pointer = get_stack_pointer_register(self.emulator_state.get_arch_name())
+                stack_pointer_value = self.emulator_state.vm_read_reg(stack_pointer)
+
+                stack_address = stack_pointer_value + stack_offset
+                self.emulator_state.vm_inst.mem_write(stack_address,
+                                                      verified_value.to_bytes(value_width, byteorder='big'))
+            elif var.source_type == VariableSourceType.RegisterVariableSourceType:
+                bv = self.emulator_state.binary_view.get()
+                register = bv.arch.get_reg_name(var.storage)
+
+                # TODO: Map Binja reg to Icicle reg, this is just hopeful
+                self.emulator_state.set_register(register.upper(), verified_value)
+
+        show_message_box("Success", "Parameters set successfully.", MessageBoxButtonSet.OKButtonSet,
+                         MessageBoxIcon.InformationIcon)
+
+    def verify_and_update_text(self):
+        sender = self.sender()
+        value_width = sender.property("target_byte_width")
+
+        verified_text = verify_hex_string(sender.text(), False, value_width)
+        sender.setText(verified_text)
+
     def initialize_button_clicked(self):
         status = self.emulator_state.vm_status.get()
         if status != EmulationStatus.Offline:
@@ -145,11 +246,13 @@ class EmulatorSidebarWidget(SidebarWidget):
                     memory_attr = icicle.MemoryProtection.ReadWrite
 
             self.emulator_state.vm_inst.mem_map(section.start, section.length, memory_attr)
-            log.log_info(f"Mapped section region {hex(section.start)} - {hex(section.start + section.length)} {memory_attr}")
+            log.log_info(
+                f"Mapped section region {hex(section.start)} - {hex(section.start + section.length)} {memory_attr}")
 
             bv = self.emulator_state.binary_view.get()
             self.emulator_state.vm_inst.mem_write(section.start, bv.read(section.start, section.length))
-            log.log_info(f"Loaded section region {hex(section.start)} - {hex(section.start + section.length)} {memory_attr}")
+            log.log_info(
+                f"Loaded section region {hex(section.start)} - {hex(section.start + section.length)} {memory_attr}")
 
         for allocation in memory:
             enabled, (start, length, permissions) = allocation
@@ -325,7 +428,7 @@ class EmulatorSidebarWidget(SidebarWidget):
         self.emulator_state.register_state.set(reg_state)
         self.emulator_state.vm_status.set(EmulationStatus.Offline)
 
-    def monitor_vm_memory(self, new_allocations : List[Tuple[bool, Tuple[int, int, PagePermissions]]]):
+    def monitor_vm_memory(self, new_allocations: List[Tuple[bool, Tuple[int, int, PagePermissions]]]):
         # remove any tuple from the list which is not enabled
         new_allocations = [alloc for alloc in new_allocations if alloc[0]]
 
@@ -355,7 +458,7 @@ class EmulatorSidebarWidget(SidebarWidget):
 
         allocations_to_remove = self.current_allocations - new_allocations_set
         for allocation in allocations_to_remove:
-            (start, length, permissions)  = allocation
+            (start, length, permissions) = allocation
 
             self.emulator_state.vm_inst.mem_unmap(start, length)
             log.log_info(f"Unmapped memory region {hex(start)} - {hex(start + length)} {permissions}")
@@ -439,6 +542,7 @@ class EmulatorSidebarWidgetType(SidebarWidgetType):
 def callbackmethod(bv):
     log.log_info("iEmu initialized")
 
+
 def range_address_handle_run(bv, start, len):
     widget = sidebar_widget_instances.get(bv)
     if widget:
@@ -448,6 +552,7 @@ def range_address_handle_run(bv, start, len):
         widget.run_button_clicked()
     else:
         log.log_error("Unable to find iEmulator associated with the current BinaryView")
+
 
 def address_handle_run(bv, start):
     widget = sidebar_widget_instances.get(bv)
@@ -468,8 +573,19 @@ def update_rip(bv, start):
         log.log_error("Unable to find iEmulator associated with the current BinaryView")
 
 
+def find_function_constants(bv, func):
+    widget = sidebar_widget_instances.get(bv)
+    if widget:
+        widget.create_args_setup(bv, func)
+    else:
+        log.log_error("Unable to find iEmulator associated with the current BinaryView")
+
+
 Sidebar.addSidebarWidgetType(EmulatorSidebarWidgetType())
 PluginCommand.register_for_address("iEmu: Update RIP", "Update RIP register", update_rip)
 PluginCommand.register_for_address("iEmu: Run from", "Update RIP register then run emulator", address_handle_run)
 PluginCommand.register_for_range("iEmu: Run Selection", "Update RIP register then run emulator until highlight end",
                                  range_address_handle_run)
+
+PluginCommand.register_for_function("iEmu: Setup Args", "Setup function argumee",
+                                    find_function_constants)

@@ -1,15 +1,17 @@
-def verify_hex_string(s: str, append: bool = True) -> str:
-    str_out = ""
+def verify_hex_string(s: str, append: bool = True, size: int = -1) -> str:
     try:
-        # will throw exception if not hex
-        int(s, 16)
-        str_out = s
+        val = int(s, 16)
     except ValueError:
-        str_out = "0"
+        val = 0
+
+    if size < 0:
+        out_str = f"{val:x}"
+    else:
+        out_str = f"{val:0{size * 2}x}"
+        if len(out_str) > size * 2:
+            out_str = out_str[-size * 2:]
 
     if append:
-        if str_out.startswith("0x"):
-            return str_out
-        return f"0x{str_out}"
+        out_str = f"0x{out_str}"
 
-    return str_out
+    return out_str
