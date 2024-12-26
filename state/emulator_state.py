@@ -151,14 +151,11 @@ class EmulatorState:
 
         if reg in overrides:
             rebuild_regs = overrides[reg]
-            print("reb value: ", rebuild_regs)
 
             value = 0
             for mask, flag in rebuild_regs.items():
                 if self.vm_inst.reg_read(flag):
                     value |= mask
-
-            print("override value: ", value)
         else:
             value = self.vm_inst.reg_read(reg)
 
