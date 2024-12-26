@@ -160,7 +160,7 @@ class EmulatorSidebarWidget(SidebarWidget):
             log.log_info(f"Mapped memory region {hex(start)} - {hex(start + length)} {permissions}")
 
         for (val, reg) in enumerate(regs):
-            self.emulator_state.vm_inst.reg_write(reg, val)
+            self.emulator_state.vm_write_reg(reg, val)
 
         self.emulator_state.vm_status.set(EmulationStatus.Initialized)
 
@@ -172,25 +172,25 @@ class EmulatorSidebarWidget(SidebarWidget):
 
         self.emulator_state.vm_status.set(EmulationStatus.Running)
 
-        ip = get_arch_instruction_pointer(self.emulator_state.binary_view.get().arch.name)
+        ip = get_arch_instruction_pointer(self.emulator_state.get_arch_name())
 
         vm = self.emulator_state.vm_inst
         until = self.emulator_state.target_rip.get()
         if until != 0:
-            log.log_info(f"Running VM from {ip}: {hex(vm.reg_read(ip))} to {ip}: {hex(until)}")
+            log.log_info(f"Running VM from {ip}: {hex(self.emulator_state.vm_read_reg(ip))} to {ip}: {hex(until)}")
             status = vm.run_until(until)
         else:
-            log.log_info(f"Running VM from {ip}: {hex(vm.reg_read(ip))}")
+            log.log_info(f"Running VM from {ip}: {hex(self.emulator_state.vm_read_reg(ip))}")
             status = vm.run()
 
         if status == icicle.RunStatus.UnhandledException:
             log.log_info(f"Status Code: {vm.exception_code}")
 
-        log.log_info(f"Run concluded at {ip}: {hex(vm.reg_read(ip))}")
+        log.log_info(f"Run concluded at {ip}: {hex(self.emulator_state.vm_read_reg(ip))}")
 
         reg_state = self.emulator_state.register_state.get()
         for (_, reg) in enumerate(self.emulator_state.register_state.get()):
-            reg_state[reg] = vm.reg_read(reg)
+            reg_state[reg] = self.emulator_state.vm_read_reg(reg)
 
         self.emulator_state.register_state.set(reg_state)
 
@@ -204,20 +204,20 @@ class EmulatorSidebarWidget(SidebarWidget):
 
         self.emulator_state.vm_status.set(EmulationStatus.Running)
 
-        ip = get_arch_instruction_pointer(self.emulator_state.binary_view.get().arch.name)
+        ip = get_arch_instruction_pointer(self.emulator_state.get_arch_name())
 
         vm = self.emulator_state.vm_inst
-        log.log_info(f"Run started at at {ip}: {hex(vm.reg_read(ip))}")
+        log.log_info(f"Run started at at {ip}: {hex(self.emulator_state.vm_read_reg(ip))}")
         status = vm.step(1)
 
         if status == icicle.RunStatus.UnhandledException:
             log.log_info(f"Status Code: {vm.exception_code}")
 
-        log.log_info(f"Run concluded at {ip}: {hex(vm.reg_read(ip))}")
+        log.log_info(f"Run concluded at {ip}: {hex(self.emulator_state.vm_read_reg(ip))}")
 
         reg_state = self.emulator_state.register_state.get()
         for (_, reg) in enumerate(self.emulator_state.register_state.get()):
-            reg_state[reg] = vm.reg_read(reg)
+            reg_state[reg] = self.emulator_state.vm_read_reg(reg)
 
         self.emulator_state.register_state.set(reg_state)
 
@@ -288,7 +288,7 @@ class EmulatorSidebarWidget(SidebarWidget):
 
         # we want to restore the previous state
         for (reg, value) in self.checkpoint_regs.items():
-            self.emulator_state.vm_inst.reg_write(reg, value)
+            self.emulator_state.vm_write_reg(reg, value)
         self.emulator_state.register_state.set(self.checkpoint_regs)
 
         for (section, buff) in self.checkpoint_sections_data.items():
@@ -363,9 +363,8 @@ class EmulatorSidebarWidget(SidebarWidget):
         self.current_allocations = new_allocations_set
 
     def monitor_vm_registers(self, values):
-        vm = self.emulator_state.vm_inst
         for reg in values:
-            vm.reg_write(reg, values[reg])
+            self.emulator_state.vm_write_reg(reg, values[reg])
 
     def update_status_label(self, status):
         self.status_label.setText(f"Status: {status.name}")
@@ -375,7 +374,7 @@ class EmulatorSidebarWidget(SidebarWidget):
             prev_highlight[0].set_auto_instr_highlight(prev_highlight[1], prev_highlight[2])
         self.prev_highlights.clear()
 
-        arch_rip = get_arch_instruction_pointer(self.emulator_state.binary_view.get().arch.name)
+        arch_rip = get_arch_instruction_pointer(self.emulator_state.get_arch_name())
 
         rip = values[arch_rip]
         fun = self.emulator_state.binary_view.get().get_functions_containing(rip)
@@ -387,7 +386,7 @@ class EmulatorSidebarWidget(SidebarWidget):
             self.prev_highlights.append((fun[0], rip, previous_highlight))
 
     def set_rip(self, rip):
-        arch_rip = get_arch_instruction_pointer(self.emulator_state.binary_view.get().arch.name)
+        arch_rip = get_arch_instruction_pointer(self.emulator_state.get_arch_name())
         self.emulator_state.set_register(arch_rip, rip)
 
     def set_target_rip(self, rip):
@@ -454,6 +453,7 @@ def address_handle_run(bv, start):
     widget = sidebar_widget_instances.get(bv)
     if widget:
         widget.set_rip(start)
+        widget.set_target_rip(0)
 
         widget.run_button_clicked()
     else:

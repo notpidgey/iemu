@@ -3,7 +3,7 @@ import icicle
 
 from enum import IntFlag
 
-from iemu.state.mappings import get_arch_mapping
+from iemu.state.mappings import get_arch_mapping, get_register_mapping_override
 
 
 class PagePermissions(IntFlag):
@@ -144,3 +144,35 @@ class EmulatorState:
         icicle_arch = arch_mapping[arch.name]
 
         self.vm_inst = icicle.Icicle(icicle_arch, jit=False)
+
+    def vm_read_reg(self, reg: str):
+        arch = self.get_arch_name()
+        overrides = get_register_mapping_override(arch)
+
+        if reg in overrides:
+            rebuild_regs = overrides[reg]
+            print("reb value: ", rebuild_regs)
+
+            value = 0
+            for mask, flag in rebuild_regs.items():
+                if self.vm_inst.reg_read(flag):
+                    value |= mask
+
+            print("override value: ", value)
+        else:
+            value = self.vm_inst.reg_read(reg)
+
+        return value
+
+    def vm_write_reg(self, reg: str, value: int):
+        arch = self.get_arch_name()
+        overrides = get_register_mapping_override(arch)
+
+        if reg in overrides:
+            rebuild_regs = overrides[reg]
+
+            for mask, flag in rebuild_regs.items():
+                if value & mask:
+                    self.vm_write_reg(flag, 1)
+        else:
+            self.vm_inst.reg_write(reg, value)

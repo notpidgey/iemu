@@ -30,7 +30,7 @@ class ContextTab(QWidget):
         register_layout = QGridLayout()
         run_layout = QGridLayout()
 
-        arch = self.state.binary_view.get().arch.name
+        arch = self.state.get_arch_name()
         mappings = get_registers_for_mapping(arch)
         rip_name = get_arch_instruction_pointer(arch)
 
@@ -84,7 +84,7 @@ class ContextTab(QWidget):
         self.arch_label.setText(str(view.arch.name))
 
     def update_register_textboxes(self, registers):
-        arch = self.state.binary_view.get().arch.name
+        arch = self.state.get_arch_name()
         mappings = get_registers_for_mapping(arch)
 
         for reg, value in registers.items():
@@ -92,7 +92,7 @@ class ContextTab(QWidget):
             self.register_textboxes[reg].setText(f"0x{value:0{character_counter}x}")
 
     def update_target_rip(self, target):
-        arch = self.state.binary_view.get().arch.name
+        arch = self.state.get_arch_name()
         mappings = get_registers_for_mapping(arch)
 
         character_counter = int(mappings[get_arch_instruction_pointer(arch)] / 8 * 2)
