@@ -3,11 +3,19 @@ Author: **snow**
 
 _icicle-emu based emulator plugin for Binary Ninja._
 
+
 Supports: x86/x86_64
 
 [![iEmu demo](https://i.imgur.com/clACzcr.png)](https://i.imgur.com/llLSA7g.mp4)
 
 ## Description:
+
+### Right-click Controls
+- Update RIP: Sets the current context RIP to the address that was clicked
+- Run From: Updates the RIP and runs the emulator from the address that was clicked
+- Run Selection: Updates RIP (start) and target (end) and runs the emulator from the start address to the end address
+- Setup Args: Creates a window to input arguments for clicked function. This will update registers and write values to the stack address from the currently set stack pointer.
+![](https://i.imgur.com/ElUPm3Q.png)
 
 ### Controls
 - Initialize: Initializes the emulator which allows for memory allocation to occur. Can only be clicked when in an offline state

@@ -596,7 +596,7 @@ def find_function_constants(bv, func):
 
 Sidebar.addSidebarWidgetType(EmulatorSidebarWidgetType())
 PluginCommand.register_for_address("iEmu: Update RIP", "Update RIP register", update_rip)
-PluginCommand.register_for_address("iEmu: Run from", "Update RIP register then run emulator", address_handle_run)
+PluginCommand.register_for_address("iEmu: Run From", "Update RIP register then run emulator", address_handle_run)
 PluginCommand.register_for_range("iEmu: Run Selection", "Update RIP register then run emulator until highlight end",
                                  range_address_handle_run)
 
