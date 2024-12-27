@@ -515,6 +515,9 @@ class EmulatorSidebarWidget(SidebarWidget):
     def contextMenuEvent(self, event):
         self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
 
+    def closing(self):
+        self.dialog.close()
+
 
 class EmulatorSidebarWidgetType(SidebarWidgetType):
     def __init__(self):
