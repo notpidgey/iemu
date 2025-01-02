@@ -1,6 +1,6 @@
 def get_arch_mapping():
     # from binja arch to icicle arch name
-    return {'x86_64': 'x86_64', 'x86': 'x86'}
+    return {'x86_64': 'x86_64', 'x86': 'i686'}
 
 
 def get_registers_for_mapping(arch):
@@ -87,5 +87,14 @@ def get_arch_instruction_pointer(arch):
         return 'RIP'
     elif arch == 'x86':
         return 'EIP'
+    else:
+        return ''
+
+def get_arch_endianness(arch):
+    # todo, expose these through the icicle api
+    if arch == 'x86_64':
+        return 'little'
+    elif arch == 'x86':
+        return 'little'
     else:
         return ''

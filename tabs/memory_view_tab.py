@@ -11,6 +11,7 @@ import codecs
 
 from iemu.state.emulator_state import EmulationStatus
 from iemu.util.util import verify_hex_string
+from iemu.state.mappings import get_arch_endianness
 
 
 class MemoryViewTab(QWidget):
@@ -127,7 +128,9 @@ class MemoryViewTab(QWidget):
                         value_hex = f"{value[0]:02x}"
                         ascii_representation += chr(value[0]) if 32 <= value[0] <= 126 else "."
                     else:
-                        value_int = int.from_bytes(value, byteorder='big')
+                        byte_order = get_arch_endianness(self.context_state.get_arch_name())
+
+                        value_int = int.from_bytes(value, byteorder=byte_order)
                         value_hex = f"{value_int:0{cell_bytes * 2}x}"
                         ascii_representation += ''.join(chr(b) if 32 <= b <= 126 else "." for b in value)
                 except icicle.MemoryException:
@@ -167,9 +170,11 @@ class MemoryViewTab(QWidget):
             size = int(self.memory_view_size_dropdown.currentText())
 
             # truncate the hex string to the correct size
+            byte_order = get_arch_endianness(self.context_state.get_arch_name())
+
             new_value_hex = new_value_hex[:size * 2]
             new_value = int(new_value_hex, 16)
-            new_value_bytes = new_value.to_bytes(size, byteorder='big')
+            new_value_bytes = new_value.to_bytes(size, byteorder=byte_order)
             self.context_state.vm_inst.mem_write(address, new_value_bytes)
 
             # update the cell with the truncated value

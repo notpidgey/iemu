@@ -9,7 +9,7 @@ import icicle
 
 from iemu.util.util import verify_hex_string
 from iemu.state.emulator_state import EmulatorState, PagePermissions, EmulationStatus
-from iemu.state.mappings import get_stack_pointer_register
+from iemu.state.mappings import get_stack_pointer_register, get_arch_endianness
 
 class StackViewTab(QWidget):
     def __init__(self, parent, state: EmulatorState):
@@ -202,5 +202,6 @@ class StackViewTab(QWidget):
                 item.setText(original_value_hex)
                 return
 
-            vm.mem_write(address, new_value.to_bytes(value_width, byteorder='big'))
+            byte_order = get_arch_endianness(self.state.get_arch_name())
+            vm.mem_write(address, new_value.to_bytes(value_width, byteorder=byte_order))
             item.setText(new_value_hex)

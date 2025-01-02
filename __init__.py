@@ -10,7 +10,7 @@ import icicle
 
 from iemu.tabs.context_tab import ContextTab
 from iemu.state.mappings import get_arch_mapping, get_registers_for_mapping, get_arch_instruction_pointer, \
-    get_stack_pointer_register
+    get_stack_pointer_register, get_arch_endianness
 from iemu.state.emulator_state import EmulatorState, PagePermissions, EmulationStatus
 from iemu.tabs.memory_mappings_tab import MemoryMappingsTab
 from iemu.tabs.stack_view_tab import StackViewTab
@@ -203,8 +203,9 @@ class EmulatorSidebarWidget(SidebarWidget):
 
                 stack_address = stack_pointer_value + stack_offset
                 try:
+                    byte_order = get_arch_endianness(self.emulator_state.get_arch_name())
                     self.emulator_state.vm_inst.mem_write(stack_address,
-                                                      verified_value.to_bytes(value_width, byteorder='big'))
+                                                      verified_value.to_bytes(value_width, byteorder=byte_order))
                 except icicle.MemoryException as e:
                     log.log_error(f"Error writing to stack: {e}")
             elif var.source_type == VariableSourceType.RegisterVariableSourceType:
@@ -245,7 +246,7 @@ class EmulatorSidebarWidget(SidebarWidget):
             memory_attr = icicle.MemoryProtection.ReadOnly
             match section.semantics:
                 case SectionSemantics.DefaultSectionSemantics:
-                    memory_attr = icicle.MemoryProtection.ReadOnly
+                    memory_attr = icicle.MemoryProtection.ExecuteReadWrite
                 case SectionSemantics.ExternalSectionSemantics:
                     memory_attr = icicle.MemoryProtection.ExecuteRead
                 case SectionSemantics.ReadOnlyCodeSectionSemantics:
